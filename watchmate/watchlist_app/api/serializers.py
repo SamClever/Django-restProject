@@ -3,10 +3,18 @@ from rest_framework import serializers
 from watchlist_app.models import WatchList,StreamPlatform,Review  # Ensure the correct model is imported
 
        
+from rest_framework import serializers
+from watchlist_app.models import Review
+
 class ReviewSerializer(serializers.ModelSerializer):
+    # Add user who reviewed
+    review_user = serializers.StringRelatedField(read_only=True)
+    
     class Meta:
-        model =Review
-        fields  = '__all__'
+        model = Review
+        # Exclude 'watchList' from the fields
+        exclude = ['watchList']
+
      
       
 class WatchListSerializer(serializers.ModelSerializer):

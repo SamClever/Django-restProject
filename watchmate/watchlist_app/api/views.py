@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework import generics, mixins, viewsets
 from django.shortcuts import get_object_or_404
-
+from rest_framework.exceptions import ValidationError
 from watchlist_app.models import WatchList, StreamPlatform, Review
 from watchlist_app.api.serializers import WatchListSerializer, StreamPlatformSerializer, ReviewSerializer
 
@@ -11,12 +11,25 @@ from watchlist_app.api.serializers import WatchListSerializer, StreamPlatformSer
 
 # Generic view using mixin
 class ReviewCreate(generics.CreateAPIView):
-    serializer_class = ReviewSerializer
+   serializer_class = ReviewSerializer
 
-    def perform_create(self, serializer):
-        pk = self.kwargs['pk']
+   def get_queryset(self):
+      return Review.objects.all()
+   def perform_create(self, serializer):
+        pk = self.kwargs.get('pk')  # use parentheses!
+
+        # Use correct field name `watchList` (case-sensitive)
         watchlist = WatchList.objects.get(pk=pk)
-        serializer.save(watchlist=watchlist)
+        review_user = self.request.user
+
+        # Make sure the field name `watchList` is correct
+        review_queryset = Review.objects.filter(watchList=watchlist, review_user=review_user)
+
+        if review_queryset.exists():
+            raise ValidationError("You have already reviewed this movie.")
+        
+        serializer.save(watchList=watchlist, review_user=review_user) 
+
 
 class ReviewList(mixins.ListModelMixin, generics.GenericAPIView):
     # queryset = Review.objects.all()
@@ -33,12 +46,14 @@ class ReviewList(mixins.ListModelMixin, generics.GenericAPIView):
     # def post(self, request, *args, **kwargs):
     #     return self.create(request, *args, **kwargs)
 
+
 class ReviewDetail(mixins.RetrieveModelMixin, generics.GenericAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
+
 
 # -------------------- Stream Platforms --------------------
 
@@ -53,21 +68,22 @@ class ReviewDetail(mixins.RetrieveModelMixin, generics.GenericAPIView):
 #         watchList = get_object_or_404(queryset, pk=pk)
 #         serializer = StreamPlatformSerializer(watchList)
 #         return Response(serializer.data)
-     
-     
-#     def create(self,request):
-#       serializer = StreamPlatformSerializer(data=request.data)
-#       if serializer.is_valid():
-#           serializer.save()
-#           return Response(serializer.data)
-#       else:
-#          return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# modelvieset is so POwerfull just three lines then you have all CRUD
+#     def create(self, request):
+#         serializer = StreamPlatformSerializer(data=request.data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+#         else:
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ModelViewSet is so powerful, just three lines, then you have all CRUD
 class StreamPlatformVS(viewsets.ModelViewSet):
-   queryset = StreamPlatform.objects.all()
-   serializer_class = StreamPlatformSerializer
-   
+    queryset = StreamPlatform.objects.all()
+    serializer_class = StreamPlatformSerializer
+
+
 # *************************************
 class StreamPlatformAV(APIView):
     def get(self, request):
@@ -81,6 +97,7 @@ class StreamPlatformAV(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class StreamDetailsAV(APIView):
     def get(self, request, pk):
@@ -106,6 +123,7 @@ class StreamDetailsAV(APIView):
         # return Response({'message': 'Movie Deleted!'})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 # -------------------- Watch List --------------------
 
 class WatchListAV(APIView):
@@ -121,6 +139,7 @@ class WatchListAV(APIView):
             return Response(serializer.data)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class WatchDetailsAV(APIView):
     def get(self, request, pk):
